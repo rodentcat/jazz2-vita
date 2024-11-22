@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+#include <vitaGL.h>
+
 // Set default name and version if not provided by CMake
 #if !defined(NCINE_APP)
 #	define NCINE_APP "jazz2"

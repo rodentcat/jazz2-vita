@@ -11,7 +11,6 @@ if(POLICY CMP0144)
 	cmake_policy(SET CMP0144 NEW)
 endif()
 
-# Project metadata
 set(NCINE_ROOT ${CMAKE_SOURCE_DIR})
 set(NCINE_SOURCE_DIR "${NCINE_ROOT}/Sources")
 set(NCINE_APP "jazz2")
@@ -21,47 +20,16 @@ set(NCINE_APP_DESCRIPTION_FULL "Jazz² Resurrection is reimplementation of the g
 set(NCINE_APP_VENDOR "Dan R.")
 set(NCINE_REVERSE_DNS "jazz2.resurrection")
 set(NCINE_VERSION "2.9.1")
-
-project(Jazz2
-	VERSION "${NCINE_VERSION}"
-	DESCRIPTION "${NCINE_APP_NAME}"
-	HOMEPAGE_URL "https://deat.tk/jazz2/"
-	LANGUAGES CXX C)
-
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
-get_filename_component(PARENT_SOURCE_DIR ${CMAKE_SOURCE_DIR} DIRECTORY)
-
-if(NOT CMAKE_GENERATOR_PLATFORM OR "${CMAKE_GENERATOR_PLATFORM}" STREQUAL "${CMAKE_SYSTEM_PROCESSOR}")
-	if(EMSCRIPTEN)
-		message(STATUS "Compiling for architecture: WASM (on ${CMAKE_SYSTEM_PROCESSOR} machine)")
-	elseif(NINTENDO_SWITCH)
-		message(STATUS "Compiling for architecture: ${CMAKE_SYSTEM_PROCESSOR} (Nintendo Switch)")
-	elseif(APPLE AND CMAKE_OSX_ARCHITECTURES)
-		message(STATUS "Compiling for architecture: ${CMAKE_OSX_ARCHITECTURES} (on ${CMAKE_SYSTEM_PROCESSOR} machine)")
-	else()
-		message(STATUS "Compiling for architecture: ${CMAKE_SYSTEM_PROCESSOR}")
-	endif()
-else()
-	message(STATUS "Compiling for architecture: ${CMAKE_GENERATOR_PLATFORM} (on ${CMAKE_SYSTEM_PROCESSOR} machine)")
-endif()
-
-if(APPLE AND CMAKE_OSX_ARCHITECTURES)
-	if(CMAKE_OSX_ARCHITECTURES MATCHES "arm64")
-		set(NCINE_ARM_PROCESSOR TRUE)
-	elseif(CMAKE_OSX_ARCHITECTURES MATCHES "x86_64")
-		# Default architecture
-	else()
-		message(FATAL_ERROR "Architecture \"${CMAKE_OSX_ARCHITECTURES}\" is not supported. Only one architecture (arm64 or x86_64) could be specified at build time.")
-	endif()
-else()
-	string(FIND ${CMAKE_SYSTEM_PROCESSOR} "arm" ARM_SUBSTRING_FOUND)
-	string(FIND ${CMAKE_SYSTEM_PROCESSOR} "aarch64" AARCH64_SUBSTRING_FOUND)
-	if (ARM_SUBSTRING_FOUND GREATER -1 OR AARCH64_SUBSTRING_FOUND GREATER -1)
-		set(NCINE_ARM_PROCESSOR TRUE)
-	endif()
-endif()
+set(NCINE_PREFERRED_BACKEND "SDL2")
+message(STATUS "VITA")
 	
-include(ncine_options)
+
+if( DEFINED ENV{VITASDK} )
+    set(CMAKE_TOOLCHAIN_FILE "$ENV{VITASDK}/share/vita.toolchain.cmake" CACHE PATH "toolchain file")
+else()
+	message(FATAL_ERROR "Please define VITASDK to point to your SDK path!")
+endif()
+include("$ENV{VITASDK}/share/vita.cmake" REQUIRED)
 
 if(NOT IS_DIRECTORY ${NCINE_DATA_DIR})
 	message(WARNING "Content directory not found at: ${NCINE_DATA_DIR}")
@@ -69,44 +37,76 @@ else()
 	message(STATUS "Content directory: ${NCINE_DATA_DIR}")
 endif()
 
-include(ncine_get_version)
-include(ncine_imported_targets)
-include(ncine_imgui)
-include(ncine_tracy)
-	
-if(NCINE_BUILD_ANDROID)
-	include(ncine_generated_sources)
-	include(ncine_build_android)
-	return()
-endif()
 
-add_executable(${NCINE_APP})
-if(WINDOWS_PHONE OR WINDOWS_STORE)
-	message(STATUS "Compiling for Windows RT")
-else()
-	# Falling back to either GLFW or SDL2 if the other one is not available
-	if(NOT GLFW_FOUND AND NOT SDL2_FOUND AND NOT Qt5_FOUND)
-		message(FATAL_ERROR "No backend between SDL2, GLFW, and QT5 has been found")
-	elseif(GLFW_FOUND AND NCINE_PREFERRED_BACKEND STREQUAL "GLFW")
-		message(STATUS "Using GLFW as the preferred backend")
-	elseif(SDL2_FOUND AND NCINE_PREFERRED_BACKEND STREQUAL "SDL2")
-		message(STATUS "Using SDL2 as the preferred backend")
-	elseif(Qt5_FOUND AND NCINE_PREFERRED_BACKEND STREQUAL "QT5")
-		message(STATUS "Using QT5 as the preferred backend")
-	elseif(SDL2_FOUND AND NOT GLFW_FOUND AND NCINE_PREFERRED_BACKEND STREQUAL "GLFW")
-		set(NCINE_PREFERRED_BACKEND "SDL2")
-		message(WARNING "Using SDL2 as backend because GLFW cannot be found")
-	elseif(GLFW_FOUND AND NOT SDL2_FOUND AND NCINE_PREFERRED_BACKEND STREQUAL "SDL2")
-		set(NCINE_PREFERRED_BACKEND "GLFW")
-		message(WARNING "Using GLFW as backend because SDL2 cannot be found")
-	endif()
-endif()
 
-include(ncine_compiler_options)
-include(ncine_headers)
-include(ncine_sources)
-include(ncine_extra_sources)
-include(ncine_generated_sources)
+# vita stuff
+
+set(VITA_APPNAME "Jazz2")
+set(VITA_TITLEID "RCATJAZZ2")
+set(VITA_VERSION "01.00")
+
+
+project(${VITA_APPNAME})
+
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDATAPATH=\\\"ux0:data/jazz2/\\\"")
+
+
+
+include_directories(
+	${VITASDK}/arm-vita-eabi/include/SDL
+	${VITASDK}/arm-vita-eabi/include/SDL2
+	${CMAKE_SOURCE_DIR}/Sources
+	${CMAKE_SOURCE_DIR}/Sources/Shared
+	${CMAKE_SOURCE_DIR}/Sources/Jazz2
+	${CMAKE_SOURCE_DIR}/Sources/Jazz2/Actors
+	${CMAKE_SOURCE_DIR}/Sources/Jazz2/Actors/Collectibles
+	${CMAKE_SOURCE_DIR}/Sources/Jazz2/Actors/Enemies
+	${CMAKE_SOURCE_DIR}/Sources/Jazz2/Actors/Enemies/Bosses
+	${CMAKE_SOURCE_DIR}/Sources/Jazz2/Actors/Environment
+	${CMAKE_SOURCE_DIR}/Sources/Jazz2/Actors/Lighting
+	${CMAKE_SOURCE_DIR}/Sources/Jazz2/Actors/Multiplayer
+	${CMAKE_SOURCE_DIR}/Sources/Jazz2/Actors/Solid
+	${CMAKE_SOURCE_DIR}/Sources/Jazz2/Actors/Weapons	
+	${CMAKE_SOURCE_DIR}/Sources/Jazz2/Collisions
+	${CMAKE_SOURCE_DIR}/Sources/Jazz2/Compatibility
+	${CMAKE_SOURCE_DIR}/Sources/Jazz2/Events
+	${CMAKE_SOURCE_DIR}/Sources/Jazz2/Multiplayer
+	${CMAKE_SOURCE_DIR}/Sources/Jazz2/Multiplayer/Backends
+	${CMAKE_SOURCE_DIR}/Sources/Jazz2/Scripting
+	${CMAKE_SOURCE_DIR}/Sources/Jazz2/Tiles
+	${CMAKE_SOURCE_DIR}/Sources/Jazz2/UI
+	${CMAKE_SOURCE_DIR}/Sources/Jazz2/UI/Menu
+	${CMAKE_SOURCE_DIR}/Sources/nCine
+	${CMAKE_SOURCE_DIR}/Sources/nCine/Audio
+	${CMAKE_SOURCE_DIR}/Sources/nCine/Backends
+	${CMAKE_SOURCE_DIR}/Sources/nCine/Backends/Android
+	${CMAKE_SOURCE_DIR}/Sources/nCine/Backends/Uwp
+	${CMAKE_SOURCE_DIR}/Sources/nCine/Base
+	${CMAKE_SOURCE_DIR}/Sources/nCine/Base/ParallelHashMap
+	${CMAKE_SOURCE_DIR}/Sources/nCine/Base/pdqsort
+	${CMAKE_SOURCE_DIR}/Sources/nCine/Graphics
+
+	${CMAKE_SOURCE_DIR}/Sources/nCine/Input
+	${CMAKE_SOURCE_DIR}/Sources/nCine/IO
+	${CMAKE_SOURCE_DIR}/Sources/nCine/Primitives
+	${CMAKE_SOURCE_DIR}/Sources/nCine/Shaders
+	${CMAKE_SOURCE_DIR}/Sources/nCine/Threading
+	${CMAKE_SOURCE_DIR}/Sources/Shared
+	${CMAKE_SOURCE_DIR}/Sources/Shared/Base
+	${CMAKE_SOURCE_DIR}/Sources/Shared/Containers
+	${CMAKE_SOURCE_DIR}/Sources/Shared/Core
+	${CMAKE_SOURCE_DIR}/Sources/Shared/IO
+	${CMAKE_SOURCE_DIR}/Sources/Shared/Threading
+	${CMAKE_SOURCE_DIR}/Sources/Shared/Threading/Implementation
+	${CMAKE_SOURCE_DIR}/Sources/simdjson
+)
+
+
+link_directories(
+  ${CMAKE_CURRENT_BINARY_DIR}
+)
+
 
 # Organize main project files into folders
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
@@ -140,10 +140,823 @@ foreach(SOURCE_FILE ${GENERATED_SOURCES})
 	source_group("Generated Files" FILES ${SOURCE_FILE})
 endforeach()
 
-target_sources(${NCINE_APP} PRIVATE ${SOURCES} ${HEADERS} ${SHADER_FILES} ${GENERATED_SOURCES})
+#more vita
+add_executable(${VITA_APPNAME}
+Sources/Common.h
+Sources/Jazz2/Actors/ActorBase.h
+Sources/Jazz2/Actors/Collectibles/AmmoCollectible.h
+Sources/Jazz2/Actors/Collectibles/CarrotCollectible.h
+Sources/Jazz2/Actors/Collectibles/CarrotFlyCollectible.h
+Sources/Jazz2/Actors/Collectibles/CarrotInvincibleCollectible.h      
+Sources/Jazz2/Actors/Collectibles/CoinCollectible.h
+Sources/Jazz2/Actors/Collectibles/CollectibleBase.h
+Sources/Jazz2/Actors/Collectibles/FastFireCollectible.h
+Sources/Jazz2/Actors/Collectibles/FoodCollectible.h
+Sources/Jazz2/Actors/Collectibles/GemCollectible.h
+Sources/Jazz2/Actors/Collectibles/GemGiant.h
+Sources/Jazz2/Actors/Collectibles/GemRing.h
+Sources/Jazz2/Actors/Collectibles/OneUpCollectible.h
+Sources/Jazz2/Actors/Collectibles/Stopwatch.h
+Sources/Jazz2/Actors/Enemies/Bat.h
+Sources/Jazz2/Actors/Enemies/Bee.h
+Sources/Jazz2/Actors/Enemies/Bosses/Bilsy.h
+Sources/Jazz2/Actors/Enemies/Bosses/Bolly.h
+Sources/Jazz2/Actors/Enemies/Bosses/BossBase.h
+Sources/Jazz2/Actors/Enemies/Bosses/Bubba.h
+Sources/Jazz2/Actors/Enemies/Bosses/Devan.h
+Sources/Jazz2/Actors/Enemies/Bosses/DevanRemote.h
+Sources/Jazz2/Actors/Enemies/Bosses/Queen.h
+Sources/Jazz2/Actors/Enemies/Bosses/Robot.h
+Sources/Jazz2/Actors/Enemies/Bosses/TurtleBoss.h
+Sources/Jazz2/Actors/Enemies/Bosses/Uterus.h
+Sources/Jazz2/Actors/Enemies/Caterpillar.h
+Sources/Jazz2/Actors/Enemies/Crab.h
+Sources/Jazz2/Actors/Enemies/Demon.h
+Sources/Jazz2/Actors/Enemies/Doggy.h
+Sources/Jazz2/Actors/Enemies/Dragon.h
+Sources/Jazz2/Actors/Enemies/Dragonfly.h
+Sources/Jazz2/Actors/Enemies/EnemyBase.h
+Sources/Jazz2/Actors/Enemies/FatChick.h
+Sources/Jazz2/Actors/Enemies/Fencer.h
+Sources/Jazz2/Actors/Enemies/Fish.h
+Sources/Jazz2/Actors/Enemies/Helmut.h
+Sources/Jazz2/Actors/Enemies/LabRat.h
+Sources/Jazz2/Actors/Enemies/Lizard.h
+Sources/Jazz2/Actors/Enemies/LizardFloat.h
+Sources/Jazz2/Actors/Enemies/MadderHatter.h
+Sources/Jazz2/Actors/Enemies/Monkey.h
+Sources/Jazz2/Actors/Enemies/Rapier.h
+Sources/Jazz2/Actors/Enemies/Raven.h
+Sources/Jazz2/Actors/Enemies/Skeleton.h
+Sources/Jazz2/Actors/Enemies/Sparks.h
+Sources/Jazz2/Actors/Enemies/Sucker.h
+Sources/Jazz2/Actors/Enemies/SuckerFloat.h
+Sources/Jazz2/Actors/Enemies/Turtle.h
+Sources/Jazz2/Actors/Enemies/TurtleShell.h
+Sources/Jazz2/Actors/Enemies/TurtleTough.h
+Sources/Jazz2/Actors/Enemies/TurtleTube.h
+Sources/Jazz2/Actors/Enemies/Witch.h
+Sources/Jazz2/Actors/Environment/AirboardGenerator.h
+Sources/Jazz2/Actors/Environment/AmbientBubbles.h
+Sources/Jazz2/Actors/Environment/AmbientSound.h
+Sources/Jazz2/Actors/Environment/Bird.h
+Sources/Jazz2/Actors/Environment/BirdCage.h
+Sources/Jazz2/Actors/Environment/Bomb.h
+Sources/Jazz2/Actors/Environment/BonusWarp.h
+Sources/Jazz2/Actors/Environment/Checkpoint.h
+Sources/Jazz2/Actors/Environment/Copter.h
+Sources/Jazz2/Actors/Environment/EndOfLevel.h
+Sources/Jazz2/Actors/Environment/Eva.h
+Sources/Jazz2/Actors/Environment/IceBlock.h
+Sources/Jazz2/Actors/Environment/Moth.h
+Sources/Jazz2/Actors/Environment/RollingRock.h
+Sources/Jazz2/Actors/Environment/Spring.h
+Sources/Jazz2/Actors/Environment/SteamNote.h
+Sources/Jazz2/Actors/Environment/SwingingVine.h
+Sources/Jazz2/Actors/Explosion.h
+Sources/Jazz2/Actors/Lighting/FlickerLight.h
+Sources/Jazz2/Actors/Lighting/PulsatingRadialLight.h
+Sources/Jazz2/Actors/Lighting/StaticRadialLight.h
+Sources/Jazz2/Actors/Multiplayer/LocalPlayerOnServer.h
+Sources/Jazz2/Actors/Multiplayer/PlayerOnServer.h
+Sources/Jazz2/Actors/Multiplayer/RemotablePlayer.h
+Sources/Jazz2/Actors/Multiplayer/RemoteActor.h
+Sources/Jazz2/Actors/Multiplayer/RemotePlayerOnServer.h
+Sources/Jazz2/Actors/Player.h
+Sources/Jazz2/Actors/PlayerCorpse.h
+Sources/Jazz2/Actors/Solid/AmmoBarrel.h
+Sources/Jazz2/Actors/Solid/AmmoCrate.h
+Sources/Jazz2/Actors/Solid/BarrelContainer.h
+Sources/Jazz2/Actors/Solid/Bridge.h
+Sources/Jazz2/Actors/Solid/CrateContainer.h
+Sources/Jazz2/Actors/Solid/GemBarrel.h
+Sources/Jazz2/Actors/Solid/GemCrate.h
+Sources/Jazz2/Actors/Solid/GenericContainer.h
+Sources/Jazz2/Actors/Solid/MovingPlatform.h
+Sources/Jazz2/Actors/Solid/PinballBumper.h
+Sources/Jazz2/Actors/Solid/PinballPaddle.h
+Sources/Jazz2/Actors/Solid/Pole.h
+Sources/Jazz2/Actors/Solid/PowerUpMorphMonitor.h
+Sources/Jazz2/Actors/Solid/PowerUpShieldMonitor.h
+Sources/Jazz2/Actors/Solid/PowerUpWeaponMonitor.h
+Sources/Jazz2/Actors/Solid/PushableBox.h
+Sources/Jazz2/Actors/Solid/SpikeBall.h
+Sources/Jazz2/Actors/Solid/TriggerCrate.h
+Sources/Jazz2/Actors/SolidObjectBase.h
+Sources/Jazz2/Actors/Weapons/BlasterShot.h
+Sources/Jazz2/Actors/Weapons/BouncerShot.h
+Sources/Jazz2/Actors/Weapons/ElectroShot.h
+Sources/Jazz2/Actors/Weapons/FreezerShot.h
+Sources/Jazz2/Actors/Weapons/PepperShot.h
+Sources/Jazz2/Actors/Weapons/RFShot.h
+Sources/Jazz2/Actors/Weapons/SeekerShot.h
+Sources/Jazz2/Actors/Weapons/ShieldFireShot.h
+Sources/Jazz2/Actors/Weapons/ShieldLightningShot.h
+Sources/Jazz2/Actors/Weapons/ShieldWaterShot.h
+Sources/Jazz2/Actors/Weapons/ShotBase.h
+Sources/Jazz2/Actors/Weapons/Thunderbolt.h
+Sources/Jazz2/Actors/Weapons/TNT.h
+Sources/Jazz2/Actors/Weapons/ToasterShot.h
+Sources/Jazz2/AnimationLoopMode.h
+Sources/Jazz2/AnimState.h
+Sources/Jazz2/Collisions/DynamicTree.h
+Sources/Jazz2/Collisions/DynamicTreeBroadPhase.h
+Sources/Jazz2/Compatibility/AnimSetMapping.h
+Sources/Jazz2/Compatibility/EventConverter.h
+Sources/Jazz2/Compatibility/JJ2Anims.h
+Sources/Jazz2/Compatibility/JJ2Anims.Palettes.h
+Sources/Jazz2/Compatibility/JJ2Block.h
+Sources/Jazz2/Compatibility/JJ2Data.h
+Sources/Jazz2/Compatibility/JJ2Episode.h
+Sources/Jazz2/Compatibility/JJ2Event.h
+Sources/Jazz2/Compatibility/JJ2Level.h
+Sources/Jazz2/Compatibility/JJ2Strings.h
+Sources/Jazz2/Compatibility/JJ2Tileset.h
+Sources/Jazz2/Compatibility/JJ2Version.h
+Sources/Jazz2/ContentResolver.h
+Sources/Jazz2/ContentResolver.Shaders.h
+Sources/Jazz2/Direction.h
+Sources/Jazz2/Events/EventMap.h
+Sources/Jazz2/Events/EventSpawner.h
+Sources/Jazz2/EventType.h
+Sources/Jazz2/ExitType.h
+Sources/Jazz2/GameDifficulty.h
+Sources/Jazz2/ILevelHandler.h
+Sources/Jazz2/IResumable.h
+Sources/Jazz2/IRootController.h
+Sources/Jazz2/IStateHandler.h
+Sources/Jazz2/LevelDescriptor.h
+Sources/Jazz2/LevelFlags.h
+Sources/Jazz2/LevelHandler.h
+Sources/Jazz2/LevelInitialization.h
+Sources/Jazz2/LightEmitter.h
+Sources/Jazz2/Multiplayer/Backends/enet.h
+Sources/Jazz2/Multiplayer/ConnectionResult.h
+Sources/Jazz2/Multiplayer/INetworkHandler.h
+Sources/Jazz2/Multiplayer/MultiLevelHandler.h
+Sources/Jazz2/Multiplayer/MultiplayerGameMode.h
+Sources/Jazz2/Multiplayer/NetworkManager.h
+Sources/Jazz2/Multiplayer/PacketTypes.h
+Sources/Jazz2/Multiplayer/Peer.h
+Sources/Jazz2/Multiplayer/Reason.h
+Sources/Jazz2/Multiplayer/ServerDiscovery.h
+Sources/Jazz2/PitType.h
+Sources/Jazz2/PlayerActions.h
+Sources/Jazz2/PlayerType.h
+Sources/Jazz2/PlayerViewport.h
+Sources/Jazz2/PreferencesCache.h
+Sources/Jazz2/Resources.h
+Sources/Jazz2/RumbleDescription.h
+Sources/Jazz2/RumbleProcessor.h
+Sources/Jazz2/Scripting/JJ2PlusDefinitions.h
+Sources/Jazz2/Scripting/LevelScriptLoader.h
+Sources/Jazz2/Scripting/RegisterArray.h
+Sources/Jazz2/Scripting/RegisterDictionary.h
+Sources/Jazz2/Scripting/RegisterImGuiBindings.h
+Sources/Jazz2/Scripting/RegisterMath.h
+Sources/Jazz2/Scripting/RegisterRef.h
+Sources/Jazz2/Scripting/RegisterString.h
+Sources/Jazz2/Scripting/ScriptActorWrapper.h
+Sources/Jazz2/Scripting/ScriptLoader.h
+Sources/Jazz2/Scripting/ScriptPlayerWrapper.h
+Sources/Jazz2/ShieldType.h
+Sources/Jazz2/SuspendType.h
+Sources/Jazz2/Tiles/ITileMapOwner.h
+Sources/Jazz2/Tiles/TileCollisionParams.h
+Sources/Jazz2/Tiles/TileDestructType.h
+Sources/Jazz2/Tiles/TileMap.h
+Sources/Jazz2/Tiles/TileSet.h
+Sources/Jazz2/UI/Alignment.h
+Sources/Jazz2/UI/Canvas.h
+Sources/Jazz2/UI/Cinematics.h
+Sources/Jazz2/UI/ControlScheme.h
+Sources/Jazz2/UI/DiscordRpcClient.h
+Sources/Jazz2/UI/Font.h
+Sources/Jazz2/UI/FormattedTextBlock.h
+Sources/Jazz2/UI/HUD.h
+Sources/Jazz2/UI/LoadingHandler.h
+Sources/Jazz2/UI/Menu/AboutSection.h
+Sources/Jazz2/UI/Menu/BeginSection.h
+Sources/Jazz2/UI/Menu/ControlsOptionsSection.h
+Sources/Jazz2/UI/Menu/CreateServerOptionsSection.h
+Sources/Jazz2/UI/Menu/CustomLevelSelectSection.h
+Sources/Jazz2/UI/Menu/EpisodeSelectSection.h
+Sources/Jazz2/UI/Menu/FirstRunSection.h
+Sources/Jazz2/UI/Menu/GameplayEnhancementsSection.h
+Sources/Jazz2/UI/Menu/GameplayOptionsSection.h
+Sources/Jazz2/UI/Menu/GraphicsOptionsSection.h
+Sources/Jazz2/UI/Menu/IMenuContainer.h
+Sources/Jazz2/UI/Menu/ImportSection.h
+Sources/Jazz2/UI/Menu/InGameMenu.h
+Sources/Jazz2/UI/Menu/InputDiagnosticsSection.h
+Sources/Jazz2/UI/Menu/LanguageSelectSection.h
+Sources/Jazz2/UI/Menu/LoadingSection.h
+Sources/Jazz2/UI/Menu/MainMenu.h
+Sources/Jazz2/UI/Menu/MenuResources.h
+Sources/Jazz2/UI/Menu/MenuSection.h
+Sources/Jazz2/UI/Menu/MultiplayerGameModeSelectSection.h
+Sources/Jazz2/UI/Menu/OptionsSection.h
+Sources/Jazz2/UI/Menu/PauseSection.h
+Sources/Jazz2/UI/Menu/PlayCustomSection.h
+Sources/Jazz2/UI/Menu/RefreshCacheSection.h
+Sources/Jazz2/UI/Menu/RemapControlsSection.h
+Sources/Jazz2/UI/Menu/RescaleModeSection.h
+Sources/Jazz2/UI/Menu/ScrollableMenuSection.h
+Sources/Jazz2/UI/Menu/ServerSelectSection.h
+Sources/Jazz2/UI/Menu/SimpleMessageSection.h
+Sources/Jazz2/UI/Menu/SoundsOptionsSection.h
+Sources/Jazz2/UI/Menu/StartGameOptionsSection.h
+Sources/Jazz2/UI/Menu/TouchControlsOptionsSection.h
+Sources/Jazz2/UI/RgbLights.h
+Sources/Jazz2/UI/UpscaleRenderPass.h
+Sources/Jazz2/WarpFlags.h
+Sources/Jazz2/WeaponType.h
+Sources/Jazz2/WeatherType.h
+Sources/nCine/AppConfiguration.h
+Sources/nCine/Application.h
+Sources/nCine/Audio/ALAudioDevice.h
+Sources/nCine/Audio/AudioBuffer.h
+Sources/nCine/Audio/AudioBufferPlayer.h
+Sources/nCine/Audio/AudioLoaderMpt.h
+Sources/nCine/Audio/AudioLoaderOgg.h
+Sources/nCine/Audio/AudioLoaderWav.h
+Sources/nCine/Audio/AudioReaderMpt.h
+Sources/nCine/Audio/AudioReaderOgg.h
+Sources/nCine/Audio/AudioReaderWav.h
+Sources/nCine/Audio/AudioStream.h
+Sources/nCine/Audio/AudioStreamPlayer.h
+Sources/nCine/Audio/IAudioDevice.h
+Sources/nCine/Audio/IAudioLoader.h
+Sources/nCine/Audio/IAudioPlayer.h
+Sources/nCine/Audio/IAudioReader.h
+Sources/nCine/Backends/Android/AndroidApplication.h
+Sources/nCine/Backends/Android/AndroidInputManager.h
+Sources/nCine/Backends/Android/AndroidJniHelper.h
+Sources/nCine/Backends/Android/EglGfxDevice.h
+Sources/nCine/Backends/Android/ImGuiAndroidInput.h
+Sources/nCine/Backends/GlfwGfxDevice.h
+Sources/nCine/Backends/GlfwInputManager.h
+Sources/nCine/Backends/ImGuiGlfwInput.h
+Sources/nCine/Backends/ImGuiSdlInput.h
+Sources/nCine/Backends/Qt5GfxDevice.h
+Sources/nCine/Backends/Qt5InputManager.h
+Sources/nCine/Backends/Qt5Widget.h
+Sources/nCine/Backends/SdlGfxDevice.h
+Sources/nCine/Backends/SdlInputManager.h
+Sources/nCine/Backends/Uwp/UwpApplication.h
+Sources/nCine/Backends/Uwp/UwpGfxDevice.h
+Sources/nCine/Backends/Uwp/UwpInputManager.h
+Sources/nCine/Base/Algorithms.h
+Sources/nCine/Base/BitArray.h
+Sources/nCine/Base/BitSet.h
+Sources/nCine/Base/Clock.h
+Sources/nCine/Base/FrameTimer.h
+Sources/nCine/Base/HashFunctions.h
+Sources/nCine/Base/HashMap.h
+Sources/nCine/Base/Iterator.h
+Sources/nCine/Base/Object.h
+Sources/nCine/Base/ParallelHashMap/phmap.h
+Sources/nCine/Base/ParallelHashMap/phmap_base.h
+Sources/nCine/Base/ParallelHashMap/phmap_bits.h
+Sources/nCine/Base/ParallelHashMap/phmap_config.h
+Sources/nCine/Base/ParallelHashMap/phmap_fwd_decl.h
+Sources/nCine/Base/ParallelHashMap/phmap_utils.h
+Sources/nCine/Base/pdqsort/pdqsort.h
+Sources/nCine/Base/Random.h
+Sources/nCine/Base/ReverseIterator.h
+Sources/nCine/Base/StaticHashMap.h
+Sources/nCine/Base/StaticHashMapIterator.h
+Sources/nCine/Base/Task.h
+Sources/nCine/Base/Timer.h
+Sources/nCine/Base/TimeStamp.h
+Sources/nCine/CommonConstants.h
+Sources/nCine/CommonHeaders.h
+Sources/nCine/Graphics/AnimatedSprite.h
+Sources/nCine/Graphics/BaseSprite.h
+Sources/nCine/Graphics/BinaryShaderCache.h
+Sources/nCine/Graphics/Camera.h
+Sources/nCine/Graphics/DisplayMode.h
+Sources/nCine/Graphics/DrawableNode.h
+Sources/nCine/Graphics/Geometry.h
+Sources/nCine/Graphics/GfxCapabilities.h
+Sources/nCine/Graphics/GL/GLAttribute.h
+Sources/nCine/Graphics/GL/GLBlending.h
+Sources/nCine/Graphics/GL/GLBufferObject.h
+Sources/nCine/Graphics/GL/GLClearColor.h
+Sources/nCine/Graphics/GL/GLCullFace.h
+Sources/nCine/Graphics/GL/GLDebug.h
+Sources/nCine/Graphics/GL/GLDepthTest.h
+Sources/nCine/Graphics/GL/GLFramebuffer.h
+Sources/nCine/Graphics/GL/GLHashMap.h
+Sources/nCine/Graphics/GL/GLRenderbuffer.h
+Sources/nCine/Graphics/GL/GLScissorTest.h
+Sources/nCine/Graphics/GL/GLShader.h
+Sources/nCine/Graphics/GL/GLShaderProgram.h
+Sources/nCine/Graphics/GL/GLShaderUniformBlocks.h
+Sources/nCine/Graphics/GL/GLShaderUniforms.h
+Sources/nCine/Graphics/GL/GLTexture.h
+Sources/nCine/Graphics/GL/GLUniform.h
+Sources/nCine/Graphics/GL/GLUniformBlock.h
+Sources/nCine/Graphics/GL/GLUniformBlockCache.h
+Sources/nCine/Graphics/GL/GLUniformCache.h
+Sources/nCine/Graphics/GL/GLVertexArrayObject.h
+Sources/nCine/Graphics/GL/GLVertexFormat.h
+Sources/nCine/Graphics/GL/GLViewport.h
+Sources/nCine/Graphics/IDebugOverlay.h
+Sources/nCine/Graphics/IGfxCapabilities.h
+Sources/nCine/Graphics/IGfxDevice.h
+Sources/nCine/Graphics/ImGuiDebugOverlay.h
+Sources/nCine/Graphics/ImGuiDrawing.h
+Sources/nCine/Graphics/ITextureLoader.h
+Sources/nCine/Graphics/ITextureSaver.h
+Sources/nCine/Graphics/Material.h
+Sources/nCine/Graphics/MeshSprite.h
+Sources/nCine/Graphics/Particle.h
+Sources/nCine/Graphics/ParticleAffectors.h
+Sources/nCine/Graphics/ParticleInitializer.h
+Sources/nCine/Graphics/ParticleSystem.h
+Sources/nCine/Graphics/RectAnimation.h
+Sources/nCine/Graphics/RenderBatcher.h
+Sources/nCine/Graphics/RenderBuffersManager.h
+Sources/nCine/Graphics/RenderCommand.h
+Sources/nCine/Graphics/RenderCommandPool.h
+Sources/nCine/Graphics/RenderDocCapture.h
+Sources/nCine/Graphics/RenderQueue.h
+Sources/nCine/Graphics/RenderResources.h
+Sources/nCine/Graphics/RenderStatistics.h
+Sources/nCine/Graphics/RenderVaoPool.h
+Sources/nCine/Graphics/SceneNode.h
+Sources/nCine/Graphics/ScreenViewport.h
+Sources/nCine/Graphics/Shader.h
+Sources/nCine/Graphics/ShaderState.h
+Sources/nCine/Graphics/Sprite.h
+Sources/nCine/Graphics/Texture.h
+Sources/nCine/Graphics/TextureFormat.h
+Sources/nCine/Graphics/TextureLoaderDds.h
+Sources/nCine/Graphics/TextureLoaderKtx.h
+Sources/nCine/Graphics/TextureLoaderPkm.h
+Sources/nCine/Graphics/TextureLoaderPng.h
+Sources/nCine/Graphics/TextureLoaderPvr.h
+Sources/nCine/Graphics/TextureLoaderQoi.h
+Sources/nCine/Graphics/TextureLoaderRaw.h
+Sources/nCine/Graphics/TextureLoaderWebP.h
+Sources/nCine/Graphics/TextureSaverPng.h
+Sources/nCine/Graphics/TextureSaverWebP.h
+Sources/nCine/Graphics/Viewport.h
+Sources/nCine/I18n.h
+Sources/nCine/IAppEventHandler.h
+Sources/nCine/imconfig.h
+Sources/nCine/Input/IInputEventHandler.h
+Sources/nCine/Input/IInputManager.h
+Sources/nCine/Input/ImGuiJoyMappedInput.h
+Sources/nCine/Input/InputEvents.h
+Sources/nCine/Input/JoyMapping.h
+Sources/nCine/Input/JoyMappingDb.h
+Sources/nCine/Input/Keys.h
+Sources/nCine/IO/EmscriptenLocalFile.h
+Sources/nCine/MainApplication.h
+Sources/nCine/Primitives/AABB.h
+Sources/nCine/Primitives/Color.h
+Sources/nCine/Primitives/Colorf.h
+Sources/nCine/Primitives/Matrix4x4.h
+Sources/nCine/Primitives/Quaternion.h
+Sources/nCine/Primitives/Rect.h
+Sources/nCine/Primitives/Vector2.h
+Sources/nCine/Primitives/Vector3.h
+Sources/nCine/Primitives/Vector4.h
+Sources/nCine/ServiceLocator.h
+Sources/nCine/Threading/Atomic.h
+Sources/nCine/Threading/IThreadCommand.h
+Sources/nCine/Threading/IThreadPool.h
+Sources/nCine/Threading/Thread.h
+Sources/nCine/Threading/ThreadPool.h
+Sources/nCine/Threading/ThreadSync.h
+Sources/nCine/tracy.h
+Sources/nCine/tracy_opengl.h
+Sources/Resources.h
+Sources/Shared/Asserts.h
+Sources/Shared/Base/IDisposable.h
+Sources/Shared/Base/Memory.h
+Sources/Shared/Base/StackAlloc.h
+Sources/Shared/Base/TypeInfo.h
+Sources/Shared/Common.h
+Sources/Shared/CommonBase.h
+Sources/Shared/CommonWindows.h
+Sources/Shared/Containers/Array.h
+Sources/Shared/Containers/ArrayView.h
+Sources/Shared/Containers/DateTime.h
+Sources/Shared/Containers/Function.h
+Sources/Shared/Containers/GrowableArray.h
+Sources/Shared/Containers/Pair.h
+Sources/Shared/Containers/Reference.h
+Sources/Shared/Containers/SequenceHelpers.h
+Sources/Shared/Containers/SmallVector.h
+Sources/Shared/Containers/StaticArray.h
+Sources/Shared/Containers/String.h
+Sources/Shared/Containers/StringConcatenable.h
+Sources/Shared/Containers/StringStl.h
+Sources/Shared/Containers/StringStlView.h
+Sources/Shared/Containers/StringUtils.h
+Sources/Shared/Containers/StringView.h
+Sources/Shared/Containers/Tags.h
+Sources/Shared/Core/Backward.h
+Sources/Shared/Core/ITraceSink.h
+Sources/Shared/Core/Logger.h
+Sources/Shared/Cpu.h
+Sources/Shared/Environment.h
+Sources/Shared/IntrinsicsAvx.h
+Sources/Shared/IntrinsicsSse2.h
+Sources/Shared/IntrinsicsSse3.h
+Sources/Shared/IntrinsicsSse4.h
+Sources/Shared/IntrinsicsSsse3.h
+Sources/Shared/IO/AndroidAssetStream.h
+Sources/Shared/IO/DeflateStream.h
+Sources/Shared/IO/FileAccess.h
+Sources/Shared/IO/FileStream.h
+Sources/Shared/IO/FileSystem.h
+Sources/Shared/IO/HttpRequest.h
+Sources/Shared/IO/MemoryStream.h
+Sources/Shared/IO/PakFile.h
+Sources/Shared/IO/Stream.h
+Sources/Shared/Threading/Event.h
+Sources/Shared/Threading/Implementation/WaitOnAddress.h
+Sources/Shared/Threading/Interlocked.h
+Sources/Shared/Threading/Spinlock.h
+Sources/Shared/Utf8.h
+Sources/simdjson/simdjson.h
+Sources/TermLogo.h
+Sources/Jazz2/Actors/ActorBase.cpp
+Sources/Jazz2/Actors/Collectibles/AmmoCollectible.cpp
+Sources/Jazz2/Actors/Collectibles/CarrotCollectible.cpp
+Sources/Jazz2/Actors/Collectibles/CarrotFlyCollectible.cpp
+Sources/Jazz2/Actors/Collectibles/CarrotInvincibleCollectible.cpp    
+Sources/Jazz2/Actors/Collectibles/CoinCollectible.cpp
+Sources/Jazz2/Actors/Collectibles/CollectibleBase.cpp
+Sources/Jazz2/Actors/Collectibles/FastFireCollectible.cpp
+Sources/Jazz2/Actors/Collectibles/FoodCollectible.cpp
+Sources/Jazz2/Actors/Collectibles/GemCollectible.cpp
+Sources/Jazz2/Actors/Collectibles/GemGiant.cpp
+Sources/Jazz2/Actors/Collectibles/GemRing.cpp
+Sources/Jazz2/Actors/Collectibles/OneUpCollectible.cpp
+Sources/Jazz2/Actors/Collectibles/Stopwatch.cpp
+Sources/Jazz2/Actors/Enemies/Bat.cpp
+Sources/Jazz2/Actors/Enemies/Bee.cpp
+Sources/Jazz2/Actors/Enemies/Bosses/Bilsy.cpp
+Sources/Jazz2/Actors/Enemies/Bosses/Bolly.cpp
+Sources/Jazz2/Actors/Enemies/Bosses/BossBase.cpp
+Sources/Jazz2/Actors/Enemies/Bosses/Bubba.cpp
+Sources/Jazz2/Actors/Enemies/Bosses/Devan.cpp
+Sources/Jazz2/Actors/Enemies/Bosses/DevanRemote.cpp
+Sources/Jazz2/Actors/Enemies/Bosses/Queen.cpp
+Sources/Jazz2/Actors/Enemies/Bosses/Robot.cpp
+Sources/Jazz2/Actors/Enemies/Bosses/TurtleBoss.cpp
+Sources/Jazz2/Actors/Enemies/Bosses/Uterus.cpp
+Sources/Jazz2/Actors/Enemies/Caterpillar.cpp
+Sources/Jazz2/Actors/Enemies/Crab.cpp
+Sources/Jazz2/Actors/Enemies/Demon.cpp
+Sources/Jazz2/Actors/Enemies/Doggy.cpp
+Sources/Jazz2/Actors/Enemies/Dragon.cpp
+Sources/Jazz2/Actors/Enemies/Dragonfly.cpp
+Sources/Jazz2/Actors/Enemies/EnemyBase.cpp
+Sources/Jazz2/Actors/Enemies/FatChick.cpp
+Sources/Jazz2/Actors/Enemies/Fencer.cpp
+Sources/Jazz2/Actors/Enemies/Fish.cpp
+Sources/Jazz2/Actors/Enemies/Helmut.cpp
+Sources/Jazz2/Actors/Enemies/LabRat.cpp
+Sources/Jazz2/Actors/Enemies/Lizard.cpp
+Sources/Jazz2/Actors/Enemies/LizardFloat.cpp
+Sources/Jazz2/Actors/Enemies/MadderHatter.cpp
+Sources/Jazz2/Actors/Enemies/Monkey.cpp
+Sources/Jazz2/Actors/Enemies/Rapier.cpp
+Sources/Jazz2/Actors/Enemies/Raven.cpp
+Sources/Jazz2/Actors/Enemies/Skeleton.cpp
+Sources/Jazz2/Actors/Enemies/Sparks.cpp
+Sources/Jazz2/Actors/Enemies/Sucker.cpp
+Sources/Jazz2/Actors/Enemies/SuckerFloat.cpp
+Sources/Jazz2/Actors/Enemies/Turtle.cpp
+Sources/Jazz2/Actors/Enemies/TurtleShell.cpp
+Sources/Jazz2/Actors/Enemies/TurtleTough.cpp
+Sources/Jazz2/Actors/Enemies/TurtleTube.cpp
+Sources/Jazz2/Actors/Enemies/Witch.cpp
+Sources/Jazz2/Actors/Environment/AirboardGenerator.cpp
+Sources/Jazz2/Actors/Environment/AmbientBubbles.cpp
+Sources/Jazz2/Actors/Environment/AmbientSound.cpp
+Sources/Jazz2/Actors/Environment/Bird.cpp
+Sources/Jazz2/Actors/Environment/BirdCage.cpp
+Sources/Jazz2/Actors/Environment/Bomb.cpp
+Sources/Jazz2/Actors/Environment/BonusWarp.cpp
+Sources/Jazz2/Actors/Environment/Checkpoint.cpp
+Sources/Jazz2/Actors/Environment/Copter.cpp
+Sources/Jazz2/Actors/Environment/EndOfLevel.cpp
+Sources/Jazz2/Actors/Environment/Eva.cpp
+Sources/Jazz2/Actors/Environment/IceBlock.cpp
+Sources/Jazz2/Actors/Environment/Moth.cpp
+Sources/Jazz2/Actors/Environment/RollingRock.cpp
+Sources/Jazz2/Actors/Environment/Spring.cpp
+Sources/Jazz2/Actors/Environment/SteamNote.cpp
+Sources/Jazz2/Actors/Environment/SwingingVine.cpp
+Sources/Jazz2/Actors/Explosion.cpp
+Sources/Jazz2/Actors/Lighting/FlickerLight.cpp
+Sources/Jazz2/Actors/Lighting/PulsatingRadialLight.cpp
+Sources/Jazz2/Actors/Lighting/StaticRadialLight.cpp
+Sources/Jazz2/Actors/Multiplayer/LocalPlayerOnServer.cpp
+Sources/Jazz2/Actors/Multiplayer/PlayerOnServer.cpp
+Sources/Jazz2/Actors/Multiplayer/RemotablePlayer.cpp
+Sources/Jazz2/Actors/Multiplayer/RemoteActor.cpp
+Sources/Jazz2/Actors/Multiplayer/RemotePlayerOnServer.cpp
+Sources/Jazz2/Actors/Player.cpp
+Sources/Jazz2/Actors/PlayerCorpse.cpp
+Sources/Jazz2/Actors/Solid/AmmoBarrel.cpp
+Sources/Jazz2/Actors/Solid/AmmoCrate.cpp
+Sources/Jazz2/Actors/Solid/BarrelContainer.cpp
+Sources/Jazz2/Actors/Solid/Bridge.cpp
+Sources/Jazz2/Actors/Solid/CrateContainer.cpp
+Sources/Jazz2/Actors/Solid/GemBarrel.cpp
+Sources/Jazz2/Actors/Solid/GemCrate.cpp
+Sources/Jazz2/Actors/Solid/GenericContainer.cpp
+Sources/Jazz2/Actors/Solid/MovingPlatform.cpp
+Sources/Jazz2/Actors/Solid/PinballBumper.cpp
+Sources/Jazz2/Actors/Solid/PinballPaddle.cpp
+Sources/Jazz2/Actors/Solid/Pole.cpp
+Sources/Jazz2/Actors/Solid/PowerUpMorphMonitor.cpp
+Sources/Jazz2/Actors/Solid/PowerUpShieldMonitor.cpp
+Sources/Jazz2/Actors/Solid/PowerUpWeaponMonitor.cpp
+Sources/Jazz2/Actors/Solid/PushableBox.cpp
+Sources/Jazz2/Actors/Solid/SpikeBall.cpp
+Sources/Jazz2/Actors/Solid/TriggerCrate.cpp
+Sources/Jazz2/Actors/SolidObjectBase.cpp
+Sources/Jazz2/Actors/Weapons/BlasterShot.cpp
+Sources/Jazz2/Actors/Weapons/BouncerShot.cpp
+Sources/Jazz2/Actors/Weapons/ElectroShot.cpp
+Sources/Jazz2/Actors/Weapons/FreezerShot.cpp
+Sources/Jazz2/Actors/Weapons/PepperShot.cpp
+Sources/Jazz2/Actors/Weapons/RFShot.cpp
+Sources/Jazz2/Actors/Weapons/SeekerShot.cpp
+Sources/Jazz2/Actors/Weapons/ShieldFireShot.cpp
+Sources/Jazz2/Actors/Weapons/ShieldLightningShot.cpp
+Sources/Jazz2/Actors/Weapons/ShieldWaterShot.cpp
+Sources/Jazz2/Actors/Weapons/ShotBase.cpp
+Sources/Jazz2/Actors/Weapons/Thunderbolt.cpp
+Sources/Jazz2/Actors/Weapons/TNT.cpp
+Sources/Jazz2/Actors/Weapons/ToasterShot.cpp
+Sources/Jazz2/Collisions/DynamicTree.cpp
+Sources/Jazz2/Collisions/DynamicTreeBroadPhase.cpp
+Sources/Jazz2/Compatibility/AnimSetMapping.cpp
+Sources/Jazz2/Compatibility/EventConverter.cpp
+Sources/Jazz2/Compatibility/JJ2Anims.cpp
+Sources/Jazz2/Compatibility/JJ2Block.cpp
+Sources/Jazz2/Compatibility/JJ2Data.cpp
+Sources/Jazz2/Compatibility/JJ2Episode.cpp
+Sources/Jazz2/Compatibility/JJ2Level.cpp
+Sources/Jazz2/Compatibility/JJ2Strings.cpp
+Sources/Jazz2/Compatibility/JJ2Tileset.cpp
+Sources/Jazz2/ContentResolver.cpp
+Sources/Jazz2/Events/EventMap.cpp
+Sources/Jazz2/Events/EventSpawner.cpp
+Sources/Jazz2/LevelHandler.cpp
+Sources/Jazz2/Multiplayer/ConnectionResult.cpp
+Sources/Jazz2/Multiplayer/MultiLevelHandler.cpp
+Sources/Jazz2/Multiplayer/NetworkManager.cpp
+Sources/Jazz2/Multiplayer/ServerDiscovery.cpp
+Sources/Jazz2/PlayerViewport.cpp
+Sources/Jazz2/PreferencesCache.cpp
+Sources/Jazz2/Resources.cpp
+Sources/Jazz2/RumbleProcessor.cpp
+Sources/Jazz2/Scripting/JJ2PlusDefinitions.cpp
+Sources/Jazz2/Scripting/LevelScriptLoader.cpp
+Sources/Jazz2/Scripting/RegisterArray.cpp
+Sources/Jazz2/Scripting/RegisterDictionary.cpp
+Sources/Jazz2/Scripting/RegisterImGuiBindings.cpp
+Sources/Jazz2/Scripting/RegisterMath.cpp
+Sources/Jazz2/Scripting/RegisterRef.cpp
+Sources/Jazz2/Scripting/RegisterString.cpp
+Sources/Jazz2/Scripting/ScriptActorWrapper.cpp
+Sources/Jazz2/Scripting/ScriptLoader.cpp
+Sources/Jazz2/Scripting/ScriptPlayerWrapper.cpp
+Sources/Jazz2/Tiles/TileMap.cpp
+Sources/Jazz2/Tiles/TileSet.cpp
+Sources/Jazz2/UI/Canvas.cpp
+Sources/Jazz2/UI/Cinematics.cpp
+Sources/Jazz2/UI/ControlScheme.cpp
+Sources/Jazz2/UI/DiscordRpcClient.cpp
+Sources/Jazz2/UI/Font.cpp
+Sources/Jazz2/UI/FormattedTextBlock.cpp
+Sources/Jazz2/UI/HUD.cpp
+Sources/Jazz2/UI/LoadingHandler.cpp
+Sources/Jazz2/UI/Menu/AboutSection.cpp
+Sources/Jazz2/UI/Menu/BeginSection.cpp
+Sources/Jazz2/UI/Menu/ControlsOptionsSection.cpp
+Sources/Jazz2/UI/Menu/CreateServerOptionsSection.cpp
+Sources/Jazz2/UI/Menu/CustomLevelSelectSection.cpp
+Sources/Jazz2/UI/Menu/EpisodeSelectSection.cpp
+Sources/Jazz2/UI/Menu/FirstRunSection.cpp
+Sources/Jazz2/UI/Menu/GameplayEnhancementsSection.cpp
+Sources/Jazz2/UI/Menu/GameplayOptionsSection.cpp
+Sources/Jazz2/UI/Menu/GraphicsOptionsSection.cpp
+Sources/Jazz2/UI/Menu/ImportSection.cpp
+Sources/Jazz2/UI/Menu/InGameMenu.cpp
+Sources/Jazz2/UI/Menu/InputDiagnosticsSection.cpp
+Sources/Jazz2/UI/Menu/LanguageSelectSection.cpp
+Sources/Jazz2/UI/Menu/LoadingSection.cpp
+Sources/Jazz2/UI/Menu/MainMenu.cpp
+Sources/Jazz2/UI/Menu/MultiplayerGameModeSelectSection.cpp
+Sources/Jazz2/UI/Menu/OptionsSection.cpp
+Sources/Jazz2/UI/Menu/PauseSection.cpp
+Sources/Jazz2/UI/Menu/PlayCustomSection.cpp
+Sources/Jazz2/UI/Menu/RefreshCacheSection.cpp
+Sources/Jazz2/UI/Menu/RemapControlsSection.cpp
+Sources/Jazz2/UI/Menu/RescaleModeSection.cpp
+Sources/Jazz2/UI/Menu/ServerSelectSection.cpp
+Sources/Jazz2/UI/Menu/SimpleMessageSection.cpp
+Sources/Jazz2/UI/Menu/SoundsOptionsSection.cpp
+Sources/Jazz2/UI/Menu/StartGameOptionsSection.cpp
+Sources/Jazz2/UI/Menu/TouchControlsOptionsSection.cpp
+Sources/Jazz2/UI/RgbLights.cpp
+Sources/Jazz2/UI/UpscaleRenderPass.cpp
+Sources/Main.cpp
+Sources/nCine/AppConfiguration.cpp
+Sources/nCine/Application.cpp
+Sources/nCine/Audio/ALAudioDevice.cpp
+Sources/nCine/Audio/AudioBuffer.cpp
+Sources/nCine/Audio/AudioBufferPlayer.cpp
+Sources/nCine/Audio/AudioLoaderMpt.cpp
+Sources/nCine/Audio/AudioLoaderOgg.cpp
+Sources/nCine/Audio/AudioLoaderWav.cpp
+Sources/nCine/Audio/AudioReaderMpt.cpp
+Sources/nCine/Audio/AudioReaderOgg.cpp
+Sources/nCine/Audio/AudioReaderWav.cpp
+Sources/nCine/Audio/AudioStream.cpp
+Sources/nCine/Audio/AudioStreamPlayer.cpp
+Sources/nCine/Audio/IAudioLoader.cpp
+Sources/nCine/Audio/IAudioPlayer.cpp
+Sources/nCine/Backends/Android/AndroidApplication.cpp
+Sources/nCine/Backends/Android/AndroidInputManager.cpp
+Sources/nCine/Backends/Android/AndroidJniHelper.cpp
+Sources/nCine/Backends/Android/AndroidKeys.cpp
+Sources/nCine/Backends/Android/EglGfxDevice.cpp
+Sources/nCine/Backends/Android/ImGuiAndroidInput.cpp
+Sources/nCine/Backends/GlfwGfxDevice.cpp
+Sources/nCine/Backends/GlfwInputManager.cpp
+Sources/nCine/Backends/GlfwKeys.cpp
+Sources/nCine/Backends/ImGuiGlfwInput.cpp
+Sources/nCine/Backends/ImGuiSdlInput.cpp
+Sources/nCine/Backends/Qt5GfxDevice.cpp
+Sources/nCine/Backends/Qt5InputManager.cpp
+Sources/nCine/Backends/Qt5JoyMapping.cpp
+Sources/nCine/Backends/Qt5Keys.cpp
+Sources/nCine/Backends/Qt5Widget.cpp
+Sources/nCine/Backends/SdlGfxDevice.cpp
+Sources/nCine/Backends/SdlInputManager.cpp
+Sources/nCine/Backends/SdlKeys.cpp
+Sources/nCine/Backends/Uwp/UwpApplication.cpp
+Sources/nCine/Backends/Uwp/UwpGfxDevice.cpp
+Sources/nCine/Backends/Uwp/UwpInputManager.cpp
+Sources/nCine/Base/Algorithms.cpp
+Sources/nCine/Base/BitArray.cpp
+Sources/nCine/Base/Clock.cpp
+Sources/nCine/Base/FrameTimer.cpp
+Sources/nCine/Base/HashFunctions.cpp
+Sources/nCine/Base/Object.cpp
+Sources/nCine/Base/Random.cpp
+Sources/nCine/Base/Timer.cpp
+Sources/nCine/Base/TimeStamp.cpp
+Sources/nCine/Graphics/AnimatedSprite.cpp
+Sources/nCine/Graphics/BaseSprite.cpp
+Sources/nCine/Graphics/BinaryShaderCache.cpp
+Sources/nCine/Graphics/Camera.cpp
+Sources/nCine/Graphics/DrawableNode.cpp
+Sources/nCine/Graphics/Geometry.cpp
+Sources/nCine/Graphics/GfxCapabilities.cpp
+Sources/nCine/Graphics/GL/GLAttribute.cpp
+Sources/nCine/Graphics/GL/GLBlending.cpp
+Sources/nCine/Graphics/GL/GLBufferObject.cpp
+Sources/nCine/Graphics/GL/GLClearColor.cpp
+Sources/nCine/Graphics/GL/GLCullFace.cpp
+Sources/nCine/Graphics/GL/GLDebug.cpp
+Sources/nCine/Graphics/GL/GLDepthTest.cpp
+Sources/nCine/Graphics/GL/GLFramebuffer.cpp
+Sources/nCine/Graphics/GL/GLRenderbuffer.cpp
+Sources/nCine/Graphics/GL/GLScissorTest.cpp
+Sources/nCine/Graphics/GL/GLShader.cpp
+Sources/nCine/Graphics/GL/GLShaderProgram.cpp
+Sources/nCine/Graphics/GL/GLShaderUniformBlocks.cpp
+Sources/nCine/Graphics/GL/GLShaderUniforms.cpp
+Sources/nCine/Graphics/GL/GLTexture.cpp
+Sources/nCine/Graphics/GL/GLUniform.cpp
+Sources/nCine/Graphics/GL/GLUniformBlock.cpp
+Sources/nCine/Graphics/GL/GLUniformBlockCache.cpp
+Sources/nCine/Graphics/GL/GLUniformCache.cpp
+Sources/nCine/Graphics/GL/GLVertexArrayObject.cpp
+Sources/nCine/Graphics/GL/GLVertexFormat.cpp
+Sources/nCine/Graphics/GL/GLViewport.cpp
 
-# Windows RT uses custom packaging, enable it only for other platforms
-if(NOT WINDOWS_PHONE AND NOT WINDOWS_STORE AND NOT ANDROID AND NOT NCINE_BUILD_ANDROID AND NOT NINTENDO_SWITCH)
-	include(ncine_installation)
-endif()
-include(ncine_strip_binaries)
+Sources/nCine/Graphics/IGfxDevice.cpp
+Sources/nCine/Graphics/ImGuiDebugOverlay.cpp
+Sources/nCine/Graphics/ImGuiDrawing.cpp
+Sources/nCine/Graphics/ITextureLoader.cpp
+Sources/nCine/Graphics/ITextureSaver.cpp
+Sources/nCine/Graphics/Material.cpp
+Sources/nCine/Graphics/MeshSprite.cpp
+Sources/nCine/Graphics/Particle.cpp
+Sources/nCine/Graphics/ParticleAffectors.cpp
+Sources/nCine/Graphics/ParticleInitializer.cpp
+Sources/nCine/Graphics/ParticleSystem.cpp
+Sources/nCine/Graphics/RectAnimation.cpp
+Sources/nCine/Graphics/RenderBatcher.cpp
+Sources/nCine/Graphics/RenderBuffersManager.cpp
+Sources/nCine/Graphics/RenderCommand.cpp
+Sources/nCine/Graphics/RenderCommandPool.cpp
+Sources/nCine/Graphics/RenderDocCapture.cpp
+Sources/nCine/Graphics/RenderQueue.cpp
+Sources/nCine/Graphics/RenderResources.cpp
+Sources/nCine/Graphics/RenderStatistics.cpp
+Sources/nCine/Graphics/RenderVaoPool.cpp
+Sources/nCine/Graphics/SceneNode.cpp
+Sources/nCine/Graphics/ScreenViewport.cpp
+Sources/nCine/Graphics/Shader.cpp
+Sources/nCine/Graphics/ShaderState.cpp
+Sources/nCine/Graphics/Sprite.cpp
+Sources/nCine/Graphics/Texture.cpp
+Sources/nCine/Graphics/TextureFormat.cpp
+Sources/nCine/Graphics/TextureLoaderDds.cpp
+Sources/nCine/Graphics/TextureLoaderKtx.cpp
+Sources/nCine/Graphics/TextureLoaderPkm.cpp
+Sources/nCine/Graphics/TextureLoaderPng.cpp
+Sources/nCine/Graphics/TextureLoaderPvr.cpp
+Sources/nCine/Graphics/TextureLoaderQoi.cpp
+Sources/nCine/Graphics/TextureLoaderRaw.cpp
+Sources/nCine/Graphics/TextureLoaderWebP.cpp
+Sources/nCine/Graphics/TextureSaverPng.cpp
+Sources/nCine/Graphics/TextureSaverWebP.cpp
+Sources/nCine/Graphics/Viewport.cpp
+Sources/nCine/I18n.cpp
+Sources/nCine/Input/IInputManager.cpp
+Sources/nCine/Input/ImGuiJoyMappedInput.cpp
+Sources/nCine/Input/JoyMapping.cpp
+Sources/nCine/IO/EmscriptenLocalFile.cpp
+Sources/nCine/MainApplication.cpp
+Sources/nCine/Primitives/Color.cpp
+Sources/nCine/Primitives/Colorf.cpp
+Sources/nCine/ServiceLocator.cpp
+Sources/nCine/Threading/GccAtomic.cpp
+Sources/nCine/Threading/PosixThread.cpp
+Sources/nCine/Threading/PosixThreadSync.cpp
+Sources/nCine/Threading/StdAtomic.cpp
+Sources/nCine/Threading/ThreadPool.cpp
+Sources/nCine/Threading/WindowsAtomic.cpp
+Sources/nCine/Threading/WindowsThread.cpp
+Sources/nCine/Threading/WindowsThreadSync.cpp
+Sources/nCine/tracy_memory.cpp
+Sources/Shared/Containers/DateTime.cpp
+Sources/Shared/Containers/SmallVector.cpp
+Sources/Shared/Containers/String.cpp
+Sources/Shared/Containers/StringUtils.cpp
+Sources/Shared/Containers/StringView.cpp
+Sources/Shared/Core/Logger.cpp
+Sources/Shared/Cpu.cpp
+Sources/Shared/Environment.cpp
+Sources/Shared/IO/AndroidAssetStream.cpp
+Sources/Shared/IO/DeflateStream.cpp
+Sources/Shared/IO/FileStream.cpp
+Sources/Shared/IO/FileSystem.cpp
+Sources/Shared/IO/MemoryStream.cpp
+Sources/Shared/IO/PakFile.cpp
+Sources/Shared/IO/Stream.cpp
+Sources/Shared/Threading/Implementation/WaitOnAddress.cpp
+Sources/Shared/Utf8.cpp
+Sources/simdjson/simdjson.cpp
+)
+target_link_libraries(${VITA_APPNAME}
+SDL2
+imgui
+vitaGL
+vitashark
+mathneon
+modplug
+kbdvita
+z
+SceAppMgr_stub
+SceAppUtil_stub
+SceAudio_stub
+SceCommonDialog_stub
+SceCtrl_stub
+SceDisplay_stub
+SceGxm_stub
+SceHid_stub
+ScePower_stub
+SceShaccCg_stub
+SceSysmodule_stub
+SceTouch_stub
+)
+
+vita_create_self(eboot.bin ${VITA_APPNAME} UNSAFE)
+vita_create_vpk(${VITA_APPNAME}.vpk ${VITA_TITLEID} eboot.bin
+VERSION ${VITA_VERSION}
+NAME ${VITA_APPNAME}
+#FILE res/icon0.png sce_sys/icon0.png
+#FILE res/bg.png sce_sys/livearea/contents/bg.png
+#FILE res/startup.png sce_sys/livearea/contents/startup.png
+#FILE res/template.xml sce_sys/livearea/contents/template.xml
+)
+
+#cmake -D CMAKE_TOOLCHAIN_FILE=${VITASDK}/share/vita.toolchain.cmake -D NCINE_PREFERRED_BACKEND=SDL2 ..

@@ -1,33 +1,5 @@
 #include <CommonBase.h>
 
-#if defined(NCINE_INCLUDE_OPENGL)
-#	if defined(WITH_OPENGLES)
-#		define GL_GLEXT_PROTOTYPES
-#		include <GLES3/gl3.h>
-#		include <GLES2/gl2ext.h>
-#	elif defined(WITH_GLEW)
-#		define GLEW_NO_GLU
-#		include <GL/glew.h>
-#	elif defined(DEATH_TARGET_APPLE)
-#		define GL_SILENCE_DEPRECATION
-#		include <OpenGL/gl3.h>
-#		include <OpenGL/gl3ext.h>
-#	else
-#		if !defined(CMAKE_BUILD) && defined(__has_include)
-#			if __has_include("GL/glew.h")
-#				define __HAS_LOCAL_GLEW
-#			endif
-#		endif
-#		if defined(__HAS_LOCAL_GLEW)
-#			include "GL/glew.h"
-#		else
-#			define GL_GLEXT_PROTOTYPES
-#			include <GL/gl.h>
-#			include <GL/glext.h>
-#		endif
-#	endif
-#endif
-
 #if defined(NCINE_INCLUDE_OPENAL)
 #	if !defined(AL_ALEXT_PROTOTYPES)
 #		define AL_ALEXT_PROTOTYPES
